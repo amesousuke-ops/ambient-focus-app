@@ -1,0 +1,22 @@
+{
+  "name": "Ambient Focus Studio",
+  "short_name": "Ambient Focus",
+  "description": "スマホ対応・環境音ミキサー & 作業空間アプリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

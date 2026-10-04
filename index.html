@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ambient Focus Studio - 環境音ミキサー & 作業空間</title>
+    <meta name="theme-color" content="#020617">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Ambient Focus">
+    <link rel="manifest" href="manifest.json">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="relative min-h-screen text-slate-100 overflow-y-auto overflow-x-hidden bg-slate-950">
+
+    <!-- Dynamic HTML5 Canvas Background (Fixed) -->
+    <canvas id="bgCanvas" class="fixed inset-0 z-0 pointer-events-none"></canvas>
+
+    <!-- Main UI Container (Smooth Scrollable) -->
+    <div id="uiOverlay" class="relative z-10 flex flex-col min-h-screen transition-opacity duration-500 pb-20">
+
+        <!-- Top Navigation & Control Bar -->
+        <header class="glass-panel px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 sticky top-0 z-30">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-cyan-400 flex items-center justify-center text-xs font-extrabold text-slate-950 shadow-lg shadow-emerald-500/30 flex-shrink-0">
+                    AF
+                </div>
+                <div>
+                    <h1 class="text-base md:text-lg font-bold tracking-tight bg-gradient-to-r from-white via-emerald-100 to-slate-400 bg-clip-text text-transparent">
+                        Ambient Focus Studio
+                    </h1>
+                    <p class="text-xs text-slate-400">Defonic & Pluvior Inspired Soundscape</p>
+                </div>
+            </div>
+
+            <!-- BGM Presets & Controls -->
+            <div class="flex flex-wrap items-center gap-2 md:gap-3 w-full lg:w-auto">
+
+                <!-- Play Master Button -->
+                <button id="masterPlayBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-2 rounded-lg font-bold flex items-center space-x-1 shadow-lg transition">
+                    <span>BGM再生</span>
+                </button>
+
+                <!-- Add New Sound Channel Button -->
+                <button id="openAddChannelBtn" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs px-3 py-2 rounded-lg font-bold flex items-center space-x-1 shadow-lg transition">
+                    <span>音源追加</span>
+                </button>
+
+                <!-- Seamless Crossfade Control -->
+                <div class="flex items-center space-x-1 bg-slate-900/60 p-1.5 rounded-lg border border-slate-800">
+                    <span class="text-xs text-slate-400 pl-1">補正:</span>
+                    <select id="crossfadeSelect" class="bg-slate-800 text-slate-100 text-xs rounded px-1.5 py-1 focus:outline-none border border-slate-700 cursor-pointer" title="音声ファイルの途切れを自動クロスフェードして無音ゼロで繋ぎます">
+                        <option value="1.5" selected>自動 (1.5秒)</option>
+                        <option value="0.8">短め (0.8秒)</option>
+                        <option value="2.5">滑らか (2.5秒)</option>
+                    </select>
+                </div>
+
+                <!-- Preset Selector -->
+                <div class="flex items-center space-x-1 bg-slate-900/60 p-1.5 rounded-lg border border-slate-800">
+                    <span class="text-xs text-slate-400 pl-1">組み合わせ:</span>
+                    <select id="presetSelect" class="bg-slate-800 text-slate-100 text-xs rounded px-1.5 py-1 focus:outline-none border border-slate-700 cursor-pointer">
+                        <!-- Populated by JS -->
+                    </select>
+                    <button id="savePresetBtn" class="bg-blue-600/80 hover:bg-blue-500 text-white text-xs px-2 py-1 rounded font-medium transition" title="現在の音量組み合わせを保存">
+                        保存
+                    </button>
+                    <button id="deleteCurrentPresetBtn" class="bg-red-900/60 hover:bg-red-800 text-red-200 text-xs px-2 py-1 rounded font-medium transition" title="選択中の組み合わせを削除">
+                        削除
+                    </button>
+                    <button id="openPresetModalBtn" class="bg-purple-600/80 hover:bg-purple-500 text-white text-xs px-2 py-1 rounded font-medium transition" title="保存した組み合わせの一覧・管理">
+                        一覧
+                    </button>
+                </div>
+
+                <!-- Theme Visual Selector -->
+                <div class="flex items-center space-x-1 bg-slate-900/60 p-1.5 rounded-lg border border-slate-800">
+                    <span class="text-xs text-slate-400 pl-1">背景:</span>
+                    <select id="bgSelect" class="bg-slate-800 text-slate-100 text-xs rounded px-1.5 py-1 focus:outline-none border border-slate-700 cursor-pointer">
+                        <option value="custom_rain" selected>言の葉の雨 (Garden)</option>
+                        <option value="rain">雨滴ガラス (Rain)</option>
+                        <option value="fire">薪の火 (Fireplace)</option>
+                        <option value="stars">星空 (Stars)</option>
+                        <option value="minimal">グラデーション (Minimal)</option>
+                    </select>
+                </div>
+
+                <!-- Master Volume Slider & Mute -->
+                <div class="flex items-center space-x-2 bg-slate-900/60 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                    <button id="masterMuteBtn" class="text-xs text-slate-300 hover:text-white font-medium">
+                        音量
+                    </button>
+                    <input type="range" id="masterVolumeRange" min="0" max="1" step="0.01" value="0.8" class="w-16 md:w-20">
+                    <span id="masterVolumeVal" class="text-xs font-mono text-slate-400">80%</span>
+                </div>
+
+                <!-- Focus Mode (Full Screen & Hide UI) -->
+                <button id="focusModeBtn" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs px-2.5 py-2 rounded-lg font-semibold flex items-center border border-slate-700 transition shadow">
+                    <span>フォーカス</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace Grid (Scrolls Naturally) -->
+        <main class="flex-1 p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6 max-w-7xl mx-auto w-full">
+
+            <!-- Soundscape Channels Grid -->
+            <section class="lg:col-span-3 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+                        <span>環境音ミキサー</span>
+                        <span class="text-xs font-normal text-emerald-400">（スワイプ・全画面スクロール対応）</span>
+                    </h2>
+                    <button id="restoreDefaultChannelsBtn" class="hidden text-xs text-indigo-300 hover:text-white bg-indigo-950/70 hover:bg-indigo-900/80 border border-indigo-700/80 px-3 py-1.5 rounded-lg transition font-semibold flex items-center space-x-1 shadow" title="削除した初期音源をすべて復元します">
+                        <span>デフォルト音源を全復元</span>
+                    </button>
+                </div>
+
+                <div id="soundGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <!-- Dynamic Sound Cards Rendered by JS -->
+                </div>
+            </section>
+
+            <!-- Side Tool Panel (Pomodoro & Tasks) -->
+            <aside class="space-y-6">
+
+                <!-- Pomodoro Timer Card -->
+                <div class="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4 shadow-xl">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h3 class="text-sm font-bold text-slate-200 flex items-center space-x-1.5">
+                            <span>ポモドーロタイマー</span>
+                        </h3>
+                        <span class="text-xs text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800" id="totalFocusDisplay">0時間 0分</span>
+                    </div>
+
+                    <!-- Mode Switches -->
+                    <div class="grid grid-cols-3 gap-1 bg-slate-900/80 p-1 rounded-lg text-xs">
+                        <button id="workModeBtn" class="py-1.5 rounded font-medium transition bg-emerald-600 text-white">作業 25分</button>
+                        <button id="shortBreakModeBtn" class="py-1.5 rounded font-medium transition text-slate-400 hover:text-white">休憩 5分</button>
+                        <button id="longBreakModeBtn" class="py-1.5 rounded font-medium transition text-slate-400 hover:text-white">長休憩 15分</button>
+                    </div>
+
+                    <!-- Timer Countdown -->
+                    <div class="text-center py-3">
+                        <div id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight bg-gradient-to-b from-white to-emerald-200 bg-clip-text text-transparent">
+                            25:00
+                        </div>
+                    </div>
+
+                    <!-- Controls -->
+                    <div class="flex items-center space-x-2">
+                        <button id="timerStartBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg text-sm transition shadow">
+                            スタート
+                        </button>
+                        <button id="timerResetBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg text-sm font-medium transition">
+                            リセット
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Task / To-Do Manager Card -->
+                <div class="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4 shadow-xl">
+                    <h3 class="text-sm font-bold text-slate-200 flex items-center space-x-1.5 border-b border-slate-800 pb-3">
+                        <span>今日のタスク・目標</span>
+                    </h3>
+
+                    <!-- Add Input -->
+                    <div class="flex items-center space-x-2">
+                        <input type="text" id="taskInput" placeholder="新しいタスクを入力..." class="flex-1 bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                        <button id="addTaskBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+                            追加
+                        </button>
+                    </div>
+
+                    <!-- Task List -->
+                    <ul id="taskList" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+
+            </aside>
+
+        </main>
+    </div>
+
+    <!-- Focus Mode Exit Hint -->
+    <div id="focusExitHint" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 glass-panel px-4 py-2 rounded-full text-xs text-slate-300 cursor-pointer shadow-2xl hover:bg-slate-800 transition">
+        フォーカスモード実行中（Esc または ここをクリックしてUIを表示）
+    </div>
+
+    <!-- User Start Prompt Modal -->
+    <div id="audioStartModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+        <div class="glass-panel max-w-md w-full p-8 rounded-2xl border border-slate-800 text-center space-y-6 shadow-2xl">
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-600 to-cyan-400 flex items-center justify-center text-lg font-bold text-slate-950 shadow-xl shadow-emerald-500/40 animate-pulse-soft">
+                AF
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-slate-100 mb-2">Ambient Focus Studio</h2>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    雨の庭園とガラスを伝う雨滴の環境音空間へようこそ。<br>
+                    下のボタンを押すと環境音の再生エンジンがスタートします。
+                </p>
+            </div>
+            <button id="startAppBtn" class="w-full bg-gradient-to-r from-emerald-600 to-cyan-500 hover:from-emerald-500 hover:to-cyan-400 text-white font-bold py-3.5 px-6 rounded-xl transition transform hover:scale-105 shadow-lg shadow-cyan-500/20">
+                セッションを開始する
+            </button>
+        </div>
+    </div>
+
+    <!-- Add Channel Modal -->
+    <div id="addChannelModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+        <div class="glass-panel max-w-md w-full p-6 rounded-2xl border border-slate-800 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-slate-100 flex items-center space-x-2">
+                    <span>新しい音源チャンネルを追加</span>
+                </h3>
+                <button id="closeAddChannelModal" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <input type="hidden" id="newChIcon" value="">
+
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">チャンネル表示名:</label>
+                    <input type="text" id="newChName" placeholder="例: お気に入りのカフェBGM" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">音声ファイル (.mp3, .wav):</label>
+                    <input type="file" id="newChFile" accept="audio/*" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-slate-300">
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end space-x-2 pt-2">
+                <button id="cancelAddChBtn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold">キャンセル</button>
+                <button id="submitAddChBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shadow">追加する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Channel Modal -->
+    <div id="editChannelModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+        <div class="glass-panel max-w-md w-full p-6 rounded-2xl border border-slate-800 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-slate-100 flex items-center space-x-2">
+                    <span>チャンネル設定変更</span>
+                </h3>
+                <button id="closeEditChannelModal" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <input type="hidden" id="editChId">
+            <input type="hidden" id="editChIcon" value="">
+
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">チャンネル表示名:</label>
+                    <input type="text" id="editChName" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 mt-4">
+                <div class="flex items-center space-x-2">
+                    <button id="resetAudioChBtn" class="px-3 py-2 bg-yellow-950/80 hover:bg-yellow-900 text-yellow-300 border border-yellow-800 rounded-lg text-xs font-semibold hidden" title="差替音源を削除して元の音源に戻します">
+                        音源リセット
+                    </button>
+                    <button id="deleteChBtn" class="px-3 py-2 bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-800 rounded-lg text-xs font-semibold hidden" title="この音源チャンネル自体を削除します">
+                        チャンネル削除
+                    </button>
+                </div>
+                <div class="flex items-center space-x-2 ml-auto">
+                    <button id="cancelEditChBtn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold">キャンセル</button>
+                    <button id="submitEditChBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold shadow">保存する</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preset Manager Modal -->
+    <div id="presetModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+        <div class="glass-panel max-w-lg w-full p-6 rounded-2xl border border-slate-800 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-slate-100 flex items-center space-x-2">
+                    <span>音源組み合わせ（プリセット）保存・管理</span>
+                </h3>
+                <button id="closePresetModal" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <!-- Save Current Mix Card -->
+            <div class="bg-slate-900/90 p-4 rounded-xl border border-slate-800 space-y-3">
+                <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center space-x-1">
+                    <span>現在の音量組み合わせを保存</span>
+                </h4>
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="newPresetName" placeholder="組み合わせ名 (例: 雨とカフェの読書BGM)" class="flex-1 bg-slate-950 border border-slate-700 rounded px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                    <button id="submitSavePresetBtn" class="bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow flex-shrink-0">
+                        保存する
+                    </button>
+                </div>
+                <div>
+                    <span class="text-[11px] text-slate-400 block mb-1">含まれるアクティブな音源:</span>
+                    <div id="activeSoundsPreview" class="flex flex-wrap gap-1 text-[11px] text-slate-300">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Saved Presets List -->
+            <div class="flex-1 overflow-y-auto space-y-3 pr-1">
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    保存済み組み合わせ一覧
+                </h4>
+                <div id="presetCardsList" class="space-y-2.5">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-800 flex justify-end">
+                <button id="dismissPresetModalBtn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-20 right-6 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- Application Scripts -->
+    <script src="js/audio.js?v=8"></script>
+    <script src="js/visuals.js?v=8"></script>
+    <script src="js/app.js?v=8"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(() => {});
+            });
+        }
+    </script>
+</body>
+</html>
